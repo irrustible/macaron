@@ -1,0 +1,18 @@
+[package]
+name = "macaron-impl"
+version = "0.1.0"
+authors = ["jjl <james.laver@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+heck = "0.3.2"
+quote = "1.0.9"
+
+[dependencies.proc-macro2]
+version = "1.0.26"
+# features = ["semver-exempt"]
+
+[dependencies.syn]
+version = "1.0.69"
+features = ["full", "parsing"]
+
