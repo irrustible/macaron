@@ -1,3 +1,4 @@
+use auto_from::From;
 use syn::*;
 use proc_macro2::{Punct, TokenTree};
 use syn::ext::IdentExt;
@@ -15,28 +16,26 @@ pub struct Rule {
     pub body: Vec<Transcription>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, From)]
 pub enum Pattern {
     Group(Group<Pattern>),
     MetaGroup(MetaGroup<Pattern>),
-    NamedMetaGroup(NamedMetaGroup<Pattern>),
     MetaVar(MetaVarPattern),
     Ident(Ident),
     Punct(Punct),
 }
 
-#[derive(Clone)]
+#[derive(Clone, From)]
 pub enum Transcription {
     Group(Group<Transcription>),
     MetaGroup(MetaGroup<Transcription>),
-    NamedMetaGroup(NamedMetaGroup<Transcription>),
     MetaSplice(MetaSplice),
     MetaVar(MetaVarTrans),
     Ident(Ident),
     Punct(Punct),
 }
 
-#[derive(Clone)]
+#[derive(Clone, From)]
 pub enum Multiplier {
     One     (Token![$]),
     ZeroOne (Token![?]),
@@ -52,15 +51,6 @@ pub struct Group<T> {
 
 #[derive(Clone)]
 pub struct MetaGroup<T> {
-    pub dollar:     token::Dollar,
-    pub paren:      token::Paren,
-    pub separator:  Option<Separator>,
-    pub multiplier: Multiplier,
-    pub values:     Vec<T>,
-}
-
-#[derive(Clone)]
-pub struct NamedMetaGroup<T> {
     pub dollar:     token::Dollar,
     pub bracket:    token::Bracket,
     pub name:       Ident,
@@ -95,7 +85,7 @@ pub struct MetaVarPattern {
 
 // technically, anything except a delimiter or multiplier, but we'll
 // start here...
-#[derive(Clone)]
+#[derive(Clone, From)]
 pub enum Separator {
     Comma(Token![,]),
     Semicolon(Token![;]),
@@ -124,7 +114,7 @@ mod kw {
     syn::custom_keyword!(genparam);
 }
 
-#[derive(Clone)]
+#[derive(Clone, From)]
 pub enum FragSpec {
     /// [builtin]
     Block   (kw::block),
@@ -344,7 +334,7 @@ fn parse_metagroup_suffix(input: ParseStream) -> Result<(Option<Separator>, Mult
 }
 
 
-// a metavar, metagroup or named metagroup
+// a metavar or named metagroup
 fn parse_meta_pattern(input: ParseStream) -> Result<Pattern> {
     let dollar = input.parse::<Token![$]>()?;
     let l = input.lookahead1();
@@ -357,12 +347,6 @@ fn parse_meta_pattern(input: ParseStream) -> Result<Pattern> {
             colon: input.parse()?,
             spec:  input.parse()?,
         }))
-    } else if l.peek(token::Paren) {
-        let (paren, values) = paren_many(input)?;
-        let (separator, multiplier) = parse_metagroup_suffix(input)?;
-        Ok(Pattern::MetaGroup(MetaGroup {
-            dollar, paren, multiplier, values, separator, 
-        }))
     } else if l.peek(token::Bracket) {
         let content;
         let bracket = bracketed!(content in input);
@@ -370,7 +354,7 @@ fn parse_meta_pattern(input: ParseStream) -> Result<Pattern> {
         if content.is_empty() {
             let (paren, values) = paren_many(input)?;
             let (separator, multiplier) = parse_metagroup_suffix(input)?;
-            Ok(Pattern::NamedMetaGroup(NamedMetaGroup {
+            Ok(Pattern::MetaGroup(MetaGroup {
                 dollar, bracket, name, paren, multiplier, values, separator, 
             }))
         } else {
@@ -392,19 +376,13 @@ fn parse_meta_transcription(input: ParseStream) -> Result<Transcription> {
             dollar,
             name:  input.call(Ident::parse_any)?,
         }))
-    } else if l.peek(token::Paren) {
-        let (paren, values) = paren_many(input)?;
-        let (separator, multiplier) = parse_metagroup_suffix(input)?;
-        Ok(Transcription::MetaGroup(MetaGroup {
-            dollar, paren, multiplier, values, separator, 
-        }))
     } else if l.peek(token::Bracket) {
         let (bracket, name) = bracket_one(input, Ident::parse_any)?;
         let l = input.lookahead1();
         if l.peek(token::Paren) {
             let (paren, values) = paren_many(input)?;
             let (separator, multiplier) = parse_metagroup_suffix(input)?;
-            Ok(Transcription::NamedMetaGroup(NamedMetaGroup {
+            Ok(Transcription::MetaGroup(MetaGroup {
                 dollar, bracket, name, paren, multiplier, values, separator, 
             }))
         } else if l.peek(token::Bracket) {
