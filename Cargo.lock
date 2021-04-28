@@ -26,8 +26,7 @@ dependencies = [
 name = "macaron"
 version = "0.1.0"
 dependencies = [
- "macaron-impl",
- "proc-macro2 1.0.26",
+ "macaron-macros",
 ]
 
 [[package]]
@@ -38,7 +37,20 @@ dependencies = [
  "heck",
  "proc-macro2 1.0.26",
  "quote 1.0.9",
- "syn 1.0.69",
+ "smallvec",
+ "syn 1.0.70",
+]
+
+[[package]]
+name = "macaron-macros"
+version = "0.1.0"
+dependencies = [
+ "auto_from",
+ "heck",
+ "macaron-impl",
+ "proc-macro2 1.0.26",
+ "quote 1.0.9",
+ "syn 1.0.70",
 ]
 
 [[package]]
@@ -78,6 +90,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "smallvec"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
+
+[[package]]
 name = "syn"
 version = "0.15.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -90,9 +108,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.69"
+version = "1.0.70"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48fe99c6bd8b1cc636890bcc071842de909d902c81ac7dab53ba33c421ab8ffb"
+checksum = "b9505f307c872bab8eb46f77ae357c8eba1fdacead58ee5a850116b1d7f82883"
 dependencies = [
  "proc-macro2 1.0.26",
  "quote 1.0.9",

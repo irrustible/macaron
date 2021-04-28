@@ -4,7 +4,7 @@ A sweeter replacement for `macro_rules`.
 
 ## Status: pre-alpha
 
-Doesn't work yet. People were curious and wanted to see it.
+Doesn't work. Hopefully soon.
 
 ## Whaaat?
 
@@ -18,18 +18,24 @@ Doesn't work yet. People were curious and wanted to see it.
 * Group repetition requires use of the iterated variable.
 * etc.
 
-The main reason to use `macro_rules` is to avoid needing a
-`proc_macro`. However, one can make an argument that pulling in just
-one `proc_macro` isn't so bad (particularly if it's one a lot of
-people can make use of). Indeed, I used this argument the other day to
-permit myself use of the `paste` crate (a `proc_macro` for name
-composition).
-
-While `paste` vastly extends the capabilities of `macro_rules`, I
-began to get quite annoyed by the other limitations and realised I
-would have to write my own.
+On the other hand, writing proc macros is basically awful, so we'd
+like a middle ground - something like `macro_rules` but more powerful!
 
 ## Differences from `macro_rules`
+
+Macaron is like a `macro_rules++` - it takes the same basic idea and
+makes it more delicious:
+
+* Full order-based match precedence.
+* No hygiene at all
+* More fragment specifiers.
+* Named groups.
+
+Coming soon:
+
+* Flexible transcription-time splicing.
+* Builtin functions.
+* Syntactical equality.
 
 ### Syntax
 
@@ -38,33 +44,150 @@ familiar. We make a few additions to support more flexibility, however.
 
 #### Basic structure
 
+Whereas a `macro_rules` block defines how a single macro should match,
+a `macaron` body may contain definitions for many macros/macarons.
 
 ```
 macro_rules! call {
   ($fun:expr ($($args:expr),*) => { $fun($($args),*) }
 }
 macaron! {
-  pub call($fun:expr ($($args:expr),*) { $fun($($args),*) }
+  pub(super) macro call($fun:expr ($($args:expr),*) { $fun($($args),*) }
 }
 
 ```
 
+Definition syntax is a hybrid between regular rust format (visibility,
+keyword, name etc.) and the existing macro format (a list of patterns
+to transcriptions). `fn` becomes `macro`, the arguments become a
+pattern list and the body becomes a transcription.
+
+Macros may have multiple matches by simply defining the macro multiple
+times. The effective visibility is the visibility of the first
+definition.
+
+Macaron compiles down to `macro_rules` invocations, so the visibility
+rules are the same as for macros, but we use different syntax:
+
+* `pub(super)` means visible to the module containing the `macaron` block.
+* `pub` will prefix `#[macro_export]`to the generated code.
+* The default (no) visibility means available to macros in this macaron block.
+
+The other (rust-legal) visibilities are less useful:
+
+* `pub(crate)` is an error - it can't be implemented as it stands.
+* `pub(self)` is as useless as usual, equivalent to leaving it off.
+
+
 ### Patterns
 
-```
-$name:fragspec - metavar definition
-$(...) - metagroup
-$[name](...) - named metagroup
-```
+The major difference here is the replacement of anonymous metagroups
+with named metagroups.
+
+New patterns:
 
 ### Transcriptions
 
+As before, anonymous metagroups are replaced with named metagroups.
+
 ```
-$name - metavar interpolation
-$(...) - metagroup
-$[name]() - named metagroup
-$[name][] - macaron splice
+$[name](BODY) - iterate over metagroup `name`, substituting BODY
+${EXPR} - splice result of EXPR
 ```
+
+Splices are analogous to expanding into a macro call, except they are
+expanded during transcription and they may call other macros defined
+in the block even if they are not public.
+
+Splices are more useful than expanding to a macro definition because
+they can be used in more places. The following example is only
+possible because of splice:
+
+```rust
+macaron! {
+
+    // if `#[pin]` or `#[unpin]` is present in the attributes,
+    // strip it out, leaving other attributes intact.
+    pub(super) pinless( $[attrs]($a:attr)* $[thing](...) ) { ${ strip_pin!($[attrs]($a)*) } $thing }
+
+    // empty is easy
+    macro strip_pin() { }
+    // strip out the tokens we don't want
+    macro strip_pin( #[pin] $[rest](...) )   { ${ strip_pin!($rest) } }
+    macro strip_pin( #[unpin] $[rest](...) ) { ${ strip_pin!($rest) } }
+    // anything else should be left and we should check the rest
+    macro strip_pin($attr:attr $[rest](...)) { $attr ${ strip_pin!($rest) } }
+
+}
+```
+
+### Hygiene and structure checks
+
+lol no. you're on your own.
+
+### Metagroups
+
+### Pattern Matching
+
+Rules are permitted to overlap in `macaron`. Ambiguity is resolved by
+declaration order - the first matching rule is the one that will be
+transcribed.
+
+We have also made some changes to the patterns. The most major of
+which is the replacement of anonymous metagroups with named
+metagroups. Additionally, we now allow anonymous matches, which are
+covered in more detail when we talk about transcription.
+
+```
+$:FRAGSPEC - metafrag - anonymously match FRAGSPEC
+$[name](PATTERN) - metagroup named `name` matching PATTERN
+```
+
+We have also implemented some new fragment specifiers for metavars
+
+* `attr` - outer (regular) attribute
+* `inattr` - inner (bang) attribute
+* `name` - an ident that is a valid identifier, not a keyword
+* `genarg` - a generic argument
+* `genparam` - a generic parameter declaration
+
+### Splices
+
+
+## Implementation
+
+Macaron's compilation flow is a bit weird because that's how rust
+makes us do it. We have a two-stage compilation process:
+
+* Compilation of macarons to macro_rules (`macaron!`)
+* Expansion of macarons with resulting macro_rules (`macaron_expand!`)
+
+`macaron`:
+
+1. Parses the program AST.
+2. Assembles macarons from rules.
+3. Performs error and warning checks.
+4. Generates `macro_rules` that invoke `macaron_expand` with:
+  * The entire macaron program.
+  * The call arguments and name of the macaron.
+
+`macaron_expand`:
+
+1. Parses the program.
+2. Locates the called macaron.
+3. Matches the call arguments against each rule.
+4. Transcribe the matching rule's body.
+
+The matching process in `macaron_expand` is a bit complicated. We need
+to use syn, mostly because of metavar fragment specifiers being
+arbitrarily complex. But we also have to decide what to match on the
+basis of patterns - i.e. consult with some data.
+
+Syn's parsing is based on an efficiently retraversible
+`ParseBuffer`. Unfortunately there is no way of creating one that
+allows you to use closure or pass extra data through. Converting to
+and from `TokenStream` could be quite expensive, so we had to move the
+matching process into the parsing stage...
 
 ## Copyright and License
 

@@ -4,10 +4,6 @@ version = "0.1.0"
 authors = ["jjl <james.laver@gmail.com>"]
 edition = "2018"
 
-[lib]
-proc-macro = true
-
 [dependencies]
-macaron-impl = { path = "../macaron-impl" }
-proc-macro2 = { version = "1.0.26" }
+macaron-macros = { path = "../macaron-macros" }
 
