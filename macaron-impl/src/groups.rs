@@ -14,48 +14,48 @@ impl Group<Pattern> {
     /// time, in a metagroup round, we want to keep all the matches in
     /// their original structure while capturing fragments and
     /// metagroups.
-    pub fn parse_match(&self, stream: ParseStream, captures: &mut Captures) -> Result<Group<Match>> {
+    pub fn parse_match(&self, stream: ParseStream, scope: &mut Scope) -> Result<Group<Match>> {
         let buffer;
         match self.delim {
             MacroDelimiter::Paren(_) => {
                 let delim = MacroDelimiter::Paren(parenthesized!(buffer in stream));
-                self.parse_children(delim, buffer, captures)
+                self.parse_children(delim, buffer, scope)
             }
             MacroDelimiter::Bracket(_) => {
                 let delim = MacroDelimiter::Bracket(bracketed!(buffer in stream));
-                self.parse_children(delim, buffer, captures)
+                self.parse_children(delim, buffer, scope)
             }
             MacroDelimiter::Brace(_) => {
                 let delim = MacroDelimiter::Brace(braced!(buffer in stream));
-                self.parse_children(delim, buffer, captures)
+                self.parse_children(delim, buffer, scope)
             }
         }
     }
 
     fn parse_children(
-        &self, delim: MacroDelimiter, buffer: ParseBuffer, captures: &mut Captures
+        &self, delim: MacroDelimiter, buffer: ParseBuffer, scope: &mut Scope
     ) -> Result<Group<Match>> {
         let mut values = vec!();
-        if captures.is_rule() {
+        if scope.is_rule() {
             for p in self.values.iter() {
-                match p.parse_match(&buffer, captures)? {
+                match p.parse_match(&buffer, scope)? {
                     // We are not going to keep the child, so we just have to capture.
                     Match::Fragment(f) =>
-                        captures.rule_mut().capture_fragment(f),
+                        scope.rule_mut().capture_fragment(f),
                     Match::MetaGroup(g) =>
-                        captures.rule_mut().capture_metagroup(g),
+                        scope.rule_mut().capture_metagroup(g),
                     _ => (),
                 }
             }
         } else {
             for p in self.values.iter() {
-                let ret = p.parse_match(&buffer, captures)?;
+                let ret = p.parse_match(&buffer, scope)?;
                 match &ret {
                     // We have to clone so we can keep the child
                     Match::Fragment(f) =>
-                        captures.round_mut().capture_fragment(f.clone()),
+                        scope.round_mut().capture_fragment(f.clone()),
                     Match::MetaGroup(g) =>
-                        captures.round_mut().capture_metagroup(g.clone()),
+                        scope.round_mut().capture_metagroup(g.clone()),
                     _ => (),
                 }
                 values.push(ret);

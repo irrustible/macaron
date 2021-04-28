@@ -46,13 +46,13 @@ impl MetaGroup<Pattern> {
     }
     pub fn parse_match_round(&self, stream: ParseStream) -> Result<RoundMatch> {
         let fork = stream.fork();
-        let mut captures = Captures::Round(RoundMatch::default());
+        let mut scope = Scope::Round(RoundMatch::default());
         for p in self.values.iter() {
-            let ret = p.parse_match(&fork, &mut captures)?;
-            captures.round_mut().capture_match(ret.clone());
+            let ret = p.parse_match(&fork, &mut scope)?;
+            scope.round_mut().capture_match(ret.clone());
         }
         stream.advance_to(&fork);
-        Ok(captures.into_round())
+        Ok(scope.into_round())
     }
 
     pub fn parse_suffix(input: ParseStream) -> Result<(Option<Separator>, Multiplier)> {
@@ -89,8 +89,14 @@ impl RoundMatch {
     }
     pub fn capture_fragment(&mut self, fragment: FragmentMatch) {
         if let Some(name) = fragment.name {
-            self.fragments.insert(name.clone(), fragment.fragment);
+            self.fragments.insert(name, fragment.fragment);
         }
+    }
+    pub fn fragment(&self, name: &Ident) -> Option<&Fragment> {
+        self.fragments.get(name)
+    }
+    pub fn group(&self, name: &Ident) -> Option<&MetaGroupMatch> {
+        self.groups.get(name)
     }
 }
 

@@ -14,11 +14,10 @@ pub enum Pattern {
 }
 
 impl Pattern {
-    pub fn parse_match(&self, stream: ParseStream, captures: &mut Captures) -> Result<Match> {
+    pub fn parse_match(&self, stream: ParseStream, scope: &mut Scope) -> Result<Match> {
         match self {
-            Pattern::Group(g) => g.parse_match(stream, captures).map(Match::Group),
+            Pattern::Group(g) => g.parse_match(stream, scope).map(Match::Group),
             Pattern::MetaGroup(group) => group.parse_match(stream),
-                // Ok(Match::MetaGroup(MetaGroupMatcher { group, rounds: 0 })),
             Pattern::Fragment(f) => f.parse_match(stream).map(Match::Fragment),
             Pattern::Literal(l) => l.parse_match(stream).map(Match::Literal),
             Pattern::Ident(i) => i.parse_match(stream).map(Match::Ident),

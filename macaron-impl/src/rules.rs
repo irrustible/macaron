@@ -18,12 +18,12 @@ impl Rule {
         self.name.as_str()
     }
     pub fn parse_match<'a>(&'a self, stream: ParseStream<'a>) -> syn::Result<RuleMatch> {
-        let mut captures = Captures::Rule(RuleMatch::default());
+        let mut scope = Scope::Rule(RuleMatch::default());
         for p in self.patterns.iter() {
-            p.parse_match(stream, &mut captures)?;
+            p.parse_match(stream, &mut scope)?;
         }
         if stream.is_empty() {
-            Ok(captures.into_rule())
+            Ok(scope.into_rule())
         } else {
             Err(Error::new(stream.span(), "Expected end of stream."))
         }
@@ -42,7 +42,13 @@ impl RuleMatch {
     }
     pub fn capture_fragment(&mut self, fragment: FragmentMatch) {
         if let Some(name) = fragment.name {
-            self.fragments.insert(name.clone(), fragment.fragment);
+            self.fragments.insert(name, fragment.fragment);
         }
+    }
+    pub fn fragment(&self, name: &Ident) -> Option<&Fragment> {
+        self.fragments.get(name)
+    }
+    pub fn group(&self, name: &Ident) -> Option<&MetaGroupMatch> {
+        self.groups.get(name)
     }
 }

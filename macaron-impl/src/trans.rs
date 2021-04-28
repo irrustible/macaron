@@ -1,6 +1,7 @@
-use proc_macro2::{Literal, Punct, TokenTree};
+use proc_macro2::{Literal, Punct, TokenTree, TokenStream};
 use syn::{token, ext::IdentExt, parse::{Parse, ParseStream}, MacroDelimiter, Result, Token};
 use crate::{*, parsing::*};
+use quote::{TokenStreamExt, ToTokens};
 
 #[derive(Clone)]
 pub struct Splice {
@@ -34,10 +35,74 @@ pub enum Transcription {
     Punct(Punct),
 }
 
-// impl Transcription {
-//     pub fn transcribe(&self, matches: &Matches) {
-//     }
-// }
+impl Transcription {
+    pub fn transcribe(&self, stream: &mut TokenStream, scope: &mut Scope) -> Result<()> {
+        match self {
+            Transcription::Group(g) =>
+                self.transcribe_group(stream, scope, g)?,
+            Transcription::MetaGroup(g) =>
+                self.transcribe_metagroup(stream, scope, g)?,
+            Transcription::MetaSplice(s) =>
+                self.transcribe_metasplice(stream, scope, s)?,
+            Transcription::MetaVar(v) =>
+                self.transcribe_metavar(stream, scope, v)?,
+            Transcription::Ident(i) => i.to_tokens(stream),
+            Transcription::Punct(p) => stream.append(p.clone()),
+        }
+        Ok(())
+    }
+
+    fn transcribe_metavar(
+        &self, stream: &mut TokenStream, scope: &mut Scope, var: &MetaVarTrans
+    ) -> Result<()> {
+        match scope.fragment(&var.name) {
+            Some(f) => {
+                f.to_tokens(stream);
+                Ok(())
+            },
+            None => todo!(),
+        }
+    }
+
+    fn transcribe_group(
+        &self, stream: &mut TokenStream, scope: &mut Scope, group: &Group<Transcription>
+    ) -> Result<()> {
+        let mut inner_stream = TokenStream::new();
+        for t in group.values.iter() {
+            t.transcribe(&mut inner_stream, scope)?;
+        }
+        let inner = |stream: &mut TokenStream| stream.append_all(inner_stream);
+        match group.delim {
+            MacroDelimiter::Brace(b) => b.surround(stream, inner),
+            MacroDelimiter::Bracket(b) => b.surround(stream, inner),
+            MacroDelimiter::Paren(p) => p.surround(stream, inner),
+        }
+        Ok(())
+    }
+
+    fn transcribe_metagroup(
+        &self, stream: &mut TokenStream, scope: &mut Scope, group: &MetaGroup<Transcription>
+    ) -> Result<()> {
+        match scope.group(&group.name) {
+            Some(g) => {
+                for round in g.rounds.iter() {
+                    let mut scope = Scope::Round(round.clone());
+                    for t in group.values.iter() {
+                        t.transcribe(stream, &mut scope)?;
+                    }
+                }
+                Ok(())
+            }
+            None => todo!(),
+        }
+    }
+
+    fn transcribe_metasplice(
+        &self, stream: &mut TokenStream, scope: &mut Scope, group: &MetaSplice
+    ) -> Result<()> {
+        todo!()
+    }
+}
 
 #[derive(Clone)]
 pub struct MetaVarTrans {
@@ -87,9 +152,7 @@ impl Parse for Transcription {
 fn parse_meta_transcription(input: ParseStream) -> Result<Transcription> {
     let dollar = input.parse::<Token![$]>()?;
     let l = input.lookahead1();
-    // metavars and named metagroups have relaxed naming restrictions
-    // because macro_rules does this for metavars already.
-    if l.peek(syn::Ident::peek_any) {
+    if l.peek(syn::Ident) {
         Ok(Transcription::MetaVar(MetaVarTrans {
             dollar, name: syn::Ident::parse_any(input)?.into(),
         }))

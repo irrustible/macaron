@@ -1,47 +1,6 @@
 use proc_macro2::Punct;
 use crate::{*, metagroups::*};
 
-pub enum Captures {
-    Rule(RuleMatch),
-    Round(RoundMatch),
-}
-
-impl Captures {
-    /// warning: panics if not a rule
-    pub fn into_rule(self) -> RuleMatch {
-        match self {
-            Captures::Rule(r) => r,
-            _ => panic!("Attempted to take a RuleMatch from a Captures::Round!"),
-        }
-    }
-    /// warning: panics if not a round
-    pub fn into_round(self) -> RoundMatch {
-        match self {
-            Captures::Round(r) => r,
-            _ => panic!("Attempted to take a RoundMatch from a Captures::Rule!"),
-        }
-    }
-    pub fn is_rule(&self) -> bool {
-        matches!(self, Captures::Rule(_))
-    }
-    pub fn is_round(&self) -> bool {
-        matches!(self, Captures::Round(_))
-    }
-    /// warning: panics if not a rule
-    pub fn rule_mut(&mut self) -> &mut RuleMatch {
-        match self {
-            Captures::Rule(r) => r,
-            _ => panic!("Attempted to take a RuleMatch from a Captures::Round!"),
-        }
-    }
-    /// warning: panics if not a round
-    pub fn round_mut(&mut self) -> &mut RoundMatch {
-        match self {
-            Captures::Round(r) => r,
-            _ => panic!("Attempted to take a RoundMatch from a Captures::Rule!"),
-        }
-    }
-}
 
 #[derive(Clone)]
 pub enum Match {
@@ -52,6 +11,10 @@ pub enum Match {
     MetaGroup(MetaGroupMatch),
     Group(Group<Match>),
 }
+
+// impl Match {
+    
+// }
 
 // pub struct Program {
 //     macarons: HashMap<String, Macaron>,
