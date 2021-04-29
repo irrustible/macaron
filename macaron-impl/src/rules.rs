@@ -1,6 +1,9 @@
 use crate::*;
+use proc_macro2::TokenStream;
+use quote::ToTokens;
 use syn::{parse::{Error, ParseStream}, token, Token};
 use std::collections::HashMap;
+use std::borrow::Cow;
 
 #[derive(Clone)]
 pub struct Rule {
@@ -13,24 +16,44 @@ pub struct Rule {
     pub body: Vec<Transcription>,
 }
  
+impl ToTokens for Rule {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        if let Some(p) = self.pub_token {
+            p.to_tokens(stream);
+        }
+        self.macro_token.to_tokens(stream);
+        self.name.to_tokens(stream);
+        self.paren.surround(stream, |stream| {
+            for p in self.patterns.iter() {
+                p.to_tokens(stream);
+            }
+        });
+        self.brace.surround(stream, |stream| {
+            for p in self.body.iter() {
+                p.to_tokens(stream);
+            }
+        });
+    }
+}
+
 impl Rule {
     pub fn as_str(&self) -> &str {
         self.name.as_str()
     }
     pub fn parse_match<'a>(&'a self, stream: ParseStream<'a>) -> syn::Result<RuleMatch> {
-        let mut scope = Scope::Rule(RuleMatch::default());
+        let mut scope = Scope::Rule(Cow::Owned(RuleMatch::default()));
         for p in self.patterns.iter() {
             p.parse_match(stream, &mut scope)?;
         }
         if stream.is_empty() {
-            Ok(scope.into_rule())
+            Ok(scope.into_rule().unwrap())
         } else {
             Err(Error::new(stream.span(), "Expected end of stream."))
         }
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default, Debug)]
 pub struct RuleMatch {
     pub groups:    HashMap<Ident, MetaGroupMatch>,
     pub fragments: HashMap<Ident, Fragment>,

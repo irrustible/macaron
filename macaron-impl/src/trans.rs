@@ -2,6 +2,7 @@ use proc_macro2::{Literal, Punct, TokenTree, TokenStream};
 use syn::{token, ext::IdentExt, parse::{Parse, ParseStream}, MacroDelimiter, Result, Token};
 use crate::{*, parsing::*};
 use quote::{TokenStreamExt, ToTokens};
+use std::borrow::Cow;
 
 #[derive(Clone)]
 pub struct Splice {
@@ -17,22 +18,28 @@ pub enum SpliceExpr {
 }
 
 #[derive(Clone)]
-pub struct MetaSplice {
-    pub dollar:      token::Dollar,
-    pub bracket:     token::Bracket,
-    pub name:        Ident,
-    pub bracket2:    token::Bracket,
-    pub values:      Vec<Transcription>,
-}
-
-#[derive(Clone)]
 pub enum Transcription {
     Group(Group<Transcription>),
     MetaGroup(MetaGroup<Transcription>),
-    MetaSplice(MetaSplice),
-    MetaVar(MetaVarTrans),
+    Splice(Splice),
+    Fragment(FragmentTrans),
+    Literal(Literal),
     Ident(Ident),
     Punct(Punct),
+}
+
+impl ToTokens for Transcription {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        match self {
+            Transcription::Group(g) => g.to_tokens(stream),
+            Transcription::MetaGroup(g) => g.to_tokens(stream),
+            Transcription::Splice(s) => todo!(),
+            Transcription::Fragment(f) => f.to_tokens(stream),
+            Transcription::Ident(i) => i.to_tokens(stream),
+            Transcription::Literal(l) => l.to_tokens(stream),
+            Transcription::Punct(p) => stream.append(p.clone()),
+        }
+    }
 }
 
 impl Transcription {
@@ -42,25 +49,26 @@ impl Transcription {
                 self.transcribe_group(stream, scope, g)?,
             Transcription::MetaGroup(g) =>
                 self.transcribe_metagroup(stream, scope, g)?,
-            Transcription::MetaSplice(s) =>
-                self.transcribe_metasplice(stream, scope, s)?,
-            Transcription::MetaVar(v) =>
+            Transcription::Splice(s) =>
+                self.transcribe_splice(stream, scope, s)?,
+            Transcription::Fragment(v) =>
                 self.transcribe_metavar(stream, scope, v)?,
             Transcription::Ident(i) => i.to_tokens(stream),
+            Transcription::Literal(l) => l.to_tokens(stream),
             Transcription::Punct(p) => stream.append(p.clone()),
         }
         Ok(())
     }
 
     fn transcribe_metavar(
-        &self, stream: &mut TokenStream, scope: &mut Scope, var: &MetaVarTrans
+        &self, stream: &mut TokenStream, scope: &mut Scope, var: &FragmentTrans
     ) -> Result<()> {
         match scope.fragment(&var.name) {
             Some(f) => {
                 f.to_tokens(stream);
                 Ok(())
             },
-            None => todo!(),
+            None => Err(syn::Error::new(var.name.ident.span(), "Fragment not found")),
         }
     }
 
@@ -71,6 +79,7 @@ impl Transcription {
         for t in group.values.iter() {
             t.transcribe(&mut inner_stream, scope)?;
         }
+        // This is less efficient than it could be, because syn.
         let inner = |stream: &mut TokenStream| stream.append_all(inner_stream);
         match group.delim {
             MacroDelimiter::Brace(b) => b.surround(stream, inner),
@@ -86,28 +95,35 @@ impl Transcription {
         match scope.group(&group.name) {
             Some(g) => {
                 for round in g.rounds.iter() {
-                    let mut scope = Scope::Round(round.clone());
+                    let mut scope = Scope::Round(Cow::Borrowed(round));
                     for t in group.values.iter() {
                         t.transcribe(stream, &mut scope)?;
                     }
                 }
                 Ok(())
             }
-            None => todo!(),
+            None => Err(syn::Error::new(group.name.ident.span(), "Metagroup not found")),
         }
     }
 
-    fn transcribe_metasplice(
-        &self, stream: &mut TokenStream, scope: &mut Scope, group: &MetaSplice
+    fn transcribe_splice(
+        &self, stream: &mut TokenStream, scope: &mut Scope, splice: &Splice
     ) -> Result<()> {
         todo!()
     }
 }
 
 #[derive(Clone)]
-pub struct MetaVarTrans {
+pub struct FragmentTrans {
     pub dollar: Token![$],
     pub name: Ident,
+}
+
+impl ToTokens for FragmentTrans {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        self.dollar.to_tokens(stream);
+        self.name.to_tokens(stream);
+    }
 }
 
 fn peek_etc(input: ParseStream) -> bool {
@@ -153,28 +169,23 @@ fn parse_meta_transcription(input: ParseStream) -> Result<Transcription> {
     let dollar = input.parse::<Token![$]>()?;
     let l = input.lookahead1();
     if l.peek(syn::Ident) {
-        Ok(Transcription::MetaVar(MetaVarTrans {
+        Ok(Transcription::Fragment(FragmentTrans {
             dollar, name: syn::Ident::parse_any(input)?.into(),
         }))
+    } else if l.peek(syn::Lit) {
+        input.parse().map(Transcription::Literal)
     } else if l.peek(token::Bracket) {
         let (bracket, name) = bracket_one(input, syn::Ident::parse_any)?;
-        let l = input.lookahead1();
-        if l.peek(token::Paren) {
-            let (paren, values) = paren_many(input)?;
-            let (separator, multiplier) = MetaGroup::parse_suffix(input)?;
-            Ok(Transcription::MetaGroup(MetaGroup {
-                dollar, bracket, paren, multiplier, values, separator, name: name.into(),
-            }))
-        } else if l.peek(token::Bracket) {
-            let (bracket2, values) = bracket_many(input)?;
-            Ok(Transcription::MetaSplice(MetaSplice {
-                dollar, bracket, bracket2, values, name: name.into(),
-            }))
-        } else {
-            Err(l.error())
-        }
+        let (paren, values) = paren_many(input)?;
+        let (separator, multiplier) = MetaGroup::parse_suffix(input)?;
+        Ok(Transcription::MetaGroup(MetaGroup {
+            dollar, bracket, paren, multiplier, values, separator, name: name.into(),
+        }))
     } else if l.peek(token::Brace) {
-        // splice
+        // let (brace, values) = brace_many(input)?;
+        // Ok(Transcription::Splice(Splice {
+        //     dollar, bracket, brace, values, name: name.into(),
+        // }))
         todo!()
     } else {
         Err(l.error())

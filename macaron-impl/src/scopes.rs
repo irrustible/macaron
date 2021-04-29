@@ -1,11 +1,12 @@
 use crate::*;
+use std::borrow::Cow;
 
-pub enum Scope {
-    Rule(RuleMatch),
-    Round(RoundMatch),
+pub enum Scope<'a> {
+    Rule(Cow<'a, RuleMatch>),
+    Round(Cow<'a, RoundMatch>),
 }
 
-impl Scope {
+impl<'a> Scope<'a> {
 
     pub fn is_rule(&self) -> bool {
         matches!(self, Scope::Rule(_))
@@ -15,18 +16,25 @@ impl Scope {
         matches!(self, Scope::Round(_))
     }
 
-    /// warning: panics if not a rule
-    pub fn into_rule(self) -> RuleMatch {
+    pub fn into_round(self) -> Result<RoundMatch, RuleMatch> {
         match self {
-            Scope::Rule(r) => r,
-            _ => panic!("Attempted to take a RuleMatch from a Scope::Round!"),
+            Scope::Round(r) => Ok(r.into_owned()),
+            Scope::Rule(r) => Err(r.into_owned()),
+        }
+    }
+
+    /// warning: panics if not a rule
+    pub fn into_rule(self) -> Result<RuleMatch, RoundMatch> {
+        match self {
+            Scope::Rule(r) => Ok(r.into_owned()),
+            Scope::Round(r) => Err(r.into_owned()),
         }
     }
 
     /// warning: panics if not a round
-    pub fn into_round(self) -> RoundMatch {
+    pub fn round_mut(&mut self) -> &mut RoundMatch {
         match self {
-            Scope::Round(r) => r,
+            Scope::Round(r) => r.to_mut(),
             _ => panic!("Attempted to take a RoundMatch from a Scope::Rule!"),
         }
     }
@@ -34,16 +42,8 @@ impl Scope {
     /// warning: panics if not a rule
     pub fn rule_mut(&mut self) -> &mut RuleMatch {
         match self {
-            Scope::Rule(r) => r,
+            Scope::Rule(r) => r.to_mut(),
             _ => panic!("Attempted to take a RuleMatch from a Scope::Round!"),
-        }
-    }
-
-    /// warning: panics if not a round
-    pub fn round_mut(&mut self) -> &mut RoundMatch {
-        match self {
-            Scope::Round(r) => r,
-            _ => panic!("Attempted to take a RoundMatch from a Scope::Rule!"),
         }
     }
 

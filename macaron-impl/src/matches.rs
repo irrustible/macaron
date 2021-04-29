@@ -1,8 +1,7 @@
 use proc_macro2::Punct;
 use crate::{*, metagroups::*};
 
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Match {
     Literal(Literal),
     Ident(Ident),

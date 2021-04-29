@@ -1,7 +1,9 @@
-use syn::{token, parse::{discouraged::Speculative, ParseStream, Result}};
 use crate::*;
+use proc_macro2::TokenStream;
+use quote::ToTokens;
 use smallvec::SmallVec;
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap, fmt::{self, Debug}};
+use syn::{token, parse::{discouraged::Speculative, ParseStream, Result}};
 
 #[derive(Clone)]
 pub struct MetaGroup<T> {
@@ -14,9 +16,33 @@ pub struct MetaGroup<T> {
     pub values:      Vec<T>,
 }
 
+impl<T: ToTokens> ToTokens for MetaGroup<T> {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        self.dollar.to_tokens(stream);
+        self.bracket.surround(stream, |stream| {
+            self.name.to_tokens(stream);
+        });
+        self.paren.surround(stream, |stream| {
+            for v in self.values.iter() {
+                v.to_tokens(stream);
+            }
+        });
+        if let Some(s) = &self.separator {
+            s.to_tokens(stream);
+        }
+        self.multiplier.to_tokens(stream)
+    }
+}
+
+impl<T> Debug for MetaGroup<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
+        f.write_str("MetaGroup<T>")
+    }
+}
+
 /// Matching a metagroup does not recurse into it. We must match it
 /// potentially many times according to its multiplier.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MetaGroupMatch {
     pub name: Ident,
     pub multiplier: Multiplier,
@@ -46,13 +72,13 @@ impl MetaGroup<Pattern> {
     }
     pub fn parse_match_round(&self, stream: ParseStream) -> Result<RoundMatch> {
         let fork = stream.fork();
-        let mut scope = Scope::Round(RoundMatch::default());
+        let mut scope = Scope::Round(Cow::Owned(RoundMatch::default()));
         for p in self.values.iter() {
             let ret = p.parse_match(&fork, &mut scope)?;
             scope.round_mut().capture_match(ret.clone());
         }
         stream.advance_to(&fork);
-        Ok(scope.into_round())
+        Ok(scope.into_round().unwrap())
     }
 
     pub fn parse_suffix(input: ParseStream) -> Result<(Option<Separator>, Multiplier)> {
@@ -68,7 +94,7 @@ impl MetaGroup<Pattern> {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct RoundMatch {
     pub matches:   Vec<Match>,
     pub groups:    HashMap<Ident, MetaGroupMatch>,

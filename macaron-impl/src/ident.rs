@@ -4,7 +4,7 @@ use syn::parse::{Error, Lookahead1, Parse, ParseStream};
 use quote::ToTokens;
 use std::hash::{Hash, Hasher};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Ident {
     pub ident: syn::Ident,
     pub string: String,

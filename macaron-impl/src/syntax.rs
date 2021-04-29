@@ -1,6 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::{parse::{Parse, ParseStream}, Result, Token};
+use std::fmt::{self, Debug};
 
 #[derive(Clone)]
 pub enum Multiplier {
@@ -8,6 +9,28 @@ pub enum Multiplier {
     ZeroOne (Token![?]),
     ZeroMany(Token![*]),
     OneMany (Token![+]),
+}
+
+impl Debug for Multiplier {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
+        match self {
+            Multiplier::One(_) => f.write_str("One"),
+            Multiplier::ZeroOne(_) => f.write_str("ZeroOne"),
+            Multiplier::ZeroMany(_) => f.write_str("ZeroMany"),
+            Multiplier::OneMany(_) => f.write_str("OneMany"),
+        }
+    }
+}
+
+impl ToTokens for Multiplier {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        match self {
+            Multiplier::One(t) => t.to_tokens(stream),
+            Multiplier::ZeroOne(t) => t.to_tokens(stream),
+            Multiplier::ZeroMany(t) => t.to_tokens(stream),
+            Multiplier::OneMany(t) => t.to_tokens(stream),
+        }
+    }
 }
 
 impl Multiplier {
@@ -65,6 +88,23 @@ pub enum Separator {
     Semicolon(Token![;]),
 }
 
+impl ToTokens for Separator {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        match self {
+            Separator::Comma(t) => t.to_tokens(stream),
+            Separator::Semicolon(t) => t.to_tokens(stream),
+        }
+    }
+}
+
+impl Debug for Separator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
+        match self {
+            Separator::Comma(_) => f.write_str("Comma"),
+            Separator::Semicolon(_) => f.write_str("Semicolon"),
+        }
+    }
+}
 impl Parse for Separator {
     fn parse(input: ParseStream) -> Result<Self> {
         let l = input.lookahead1();

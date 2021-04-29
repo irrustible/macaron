@@ -1,7 +1,8 @@
+use crate::{*, parsing::*};
+use proc_macro2::{TokenStream, TokenTree, Punct};
+use quote::{TokenStreamExt, ToTokens};
 use syn::{ext::IdentExt, bracketed, token, MacroDelimiter, Result, Token};
 use syn::parse::{Error, Parse, ParseStream};
-use crate::{*, parsing::*};
-use proc_macro2::{TokenTree, Punct};
 
 #[derive(Clone)]
 pub enum Pattern {
@@ -11,6 +12,19 @@ pub enum Pattern {
     Literal(Literal),
     Ident(Ident),
     Punct(Punct),
+}
+
+impl ToTokens for Pattern {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        match self {
+            Pattern::Group(g) => g.to_tokens(stream),
+            Pattern::MetaGroup(g) => g.to_tokens(stream),
+            Pattern::Fragment(f) => f.to_tokens(stream),
+            Pattern::Literal(l) => l.to_tokens(stream),
+            Pattern::Ident(i) => i.to_tokens(stream),
+            Pattern::Punct(p) => stream.append(p.clone()),
+        }
+    }
 }
 
 impl Pattern {

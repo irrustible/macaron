@@ -1,0 +1,4 @@
+use macaron::macaron;
+
+macaron! {
+}

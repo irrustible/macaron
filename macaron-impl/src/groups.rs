@@ -1,10 +1,45 @@
 use crate::*;
+use proc_macro2::TokenStream;
 use syn::{parse::{Error, ParseBuffer, ParseStream}, braced, bracketed, parenthesized, MacroDelimiter, Result};
+use std::fmt::{self, Debug};
+use quote::ToTokens;
 
 #[derive(Clone)]
 pub struct Group<T> {
     pub delim: MacroDelimiter,
     pub values: Vec<T>,
+}
+
+impl<T: ToTokens> ToTokens for Group<T> {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        match self.delim {
+            MacroDelimiter::Brace(t) => t.surround(stream, |stream| {
+                for v in self.values.iter() {
+                    v.to_tokens(stream)
+                }
+            }),
+            MacroDelimiter::Bracket(t) => t.surround(stream, |stream| {
+                for v in self.values.iter() {
+                    v.to_tokens(stream)
+                }
+            }),
+            MacroDelimiter::Paren(t) => t.surround(stream, |stream| {
+                for v in self.values.iter() {
+                    v.to_tokens(stream)
+                }
+            }),
+        }
+    }
+}
+
+impl<T> Debug for Group<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
+        match self.delim {
+            MacroDelimiter::Paren(_) => f.write_str("()"),
+            MacroDelimiter::Bracket(_) => f.write_str("[]"),
+            MacroDelimiter::Brace(_) => f.write_str("{}"),
+        }
+    }
 }
 
 impl Group<Pattern> {

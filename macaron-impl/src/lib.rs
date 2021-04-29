@@ -1,14 +1,16 @@
 
-// pub mod bakery;
+pub mod bakery;
 // mod compiler;
-pub mod defs;
+mod defs;
+pub use defs::*;
 mod fragments;
 pub use fragments::*;
 mod ident;
 pub use ident::Ident;
 mod literal;
 pub use literal::Literal;
-pub mod macros;
+mod macarons;
+pub use macarons::*;
 pub mod matches;
 pub use matches::*;
 pub mod parsing;

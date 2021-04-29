@@ -9,13 +9,4 @@ proc-macro = true
 
 [dependencies]
 macaron-impl = { path = "../macaron-impl" }
-heck = "0.3.2"
-quote = "1.0.9"
-auto_from = "0.3.0"
 proc-macro2 = "1"
-
-[dependencies.syn]
-version = "1.0.69"
-default-features = false
-features = ["clone-impls", "full", "parsing", "printing", "proc-macro"]
-

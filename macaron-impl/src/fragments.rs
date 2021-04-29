@@ -3,7 +3,7 @@ use crate::*;
 use crate::syntax::*;
 use syn::{parse::{Parse, ParseStream, Result}, Token};
 use quote::ToTokens;
-use crate::matches::*;
+use std::fmt::{self, Debug};
 
 #[derive(Clone)]
 pub enum FragSpec {
@@ -45,6 +45,32 @@ pub enum FragSpec {
     /// [custom] Regular attribute
     OuterAttrs     (tokens::attrs),
 }
+
+impl ToTokens for FragSpec {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        match self {
+            FragSpec::Block(t) => t.to_tokens(stream),
+            FragSpec::Expr(t) => t.to_tokens(stream),
+            FragSpec::Ident(t) => t.to_tokens(stream),
+            FragSpec::Item(t) => t.to_tokens(stream),
+            FragSpec::Lifetime(t) => t.to_tokens(stream),
+            FragSpec::Literal(t) => t.to_tokens(stream),
+            FragSpec::Meta(t) => t.to_tokens(stream),
+            FragSpec::Pat(t) => t.to_tokens(stream),
+            FragSpec::Path(t) => t.to_tokens(stream),
+            FragSpec::Stmt(t) => t.to_tokens(stream),
+            FragSpec::Tt(t) => t.to_tokens(stream),
+            FragSpec::Ty(t) => t.to_tokens(stream),
+            FragSpec::Vis(t) => t.to_tokens(stream),
+            FragSpec::GenericArgument(t) => t.to_tokens(stream),
+            FragSpec::GenericParam(t) => t.to_tokens(stream),
+            FragSpec::InnerAttrs(t) => t.to_tokens(stream),
+            FragSpec::Name(t) => t.to_tokens(stream),
+            FragSpec::OuterAttrs(t) => t.to_tokens(stream),
+        }
+    }
+}
+
 
 impl Parse for FragSpec {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -110,6 +136,12 @@ pub enum Fragment {
     GenArg  (syn::GenericArgument),
     GenParam(syn::GenericParam),
     Attrs   (Attributes),
+}
+
+impl Debug for Fragment {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
+        f.write_str("Fragment")
+    }
 }
 
 impl Fragment {
@@ -179,7 +211,7 @@ impl ToTokens for Fragment {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 /// Matching a metafrag returns the matched data
 pub struct FragmentMatch {
     pub name: Option<Ident>,
@@ -198,6 +230,17 @@ pub struct FragPat {
     pub name: Option<Ident>,
     pub colon: Token![:],
     pub spec: FragSpec,
+}
+
+impl ToTokens for FragPat {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        self.dollar.to_tokens(stream);
+        if let Some(name) = &self.name {
+            name.to_tokens(stream);
+        }
+        self.colon.to_tokens(stream);
+        self.spec.to_tokens(stream);
+    }
 }
 
 impl FragPat {

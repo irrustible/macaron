@@ -1,6 +1,8 @@
 use syn::{parse::{Parse, ParseStream, Error}, Result};
+use proc_macro2::TokenStream;
+use quote::{TokenStreamExt, ToTokens};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Literal {
     pub lit: proc_macro2::Literal,
     pub string: String,
@@ -23,6 +25,12 @@ impl Literal {
                 Err(Error::new(stream.span(), "Expected ident"))
             }
         })
+    }
+}
+
+impl ToTokens for Literal {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        stream.append(self.lit.clone())
     }
 }
 
